@@ -1,0 +1,5 @@
+{
+  "name": "NutriAI - Your Personal AI Nutritionist",
+  "description": "A production-ready AI-powered nutritionist chatbot that provides personalized dietary, fitness, and lifestyle guidance using the Gemini API.",
+  "requestFramePermissions": []
+}
