@@ -2,84 +2,69 @@
 
 ## Overview
 
-This project is a **Full-Stack Chat Application** powered by **NVIDIA NIM (Nutrition Intelligence Model)**. It uses a modern React frontend and a Python-based backend, hosted as separate services.
+This project is a **Serverless Full-Stack Chat Application** powered by **NVIDIA NIM**. It uses a modern React frontend hosted on Vercel, utilizing Vercel Edge Functions to securely proxy API requests to NVIDIA's inference endpoints.
 
 ## Directory Structure
 
 ```text
 /
-├── frontend/           # React + TypeScript application
-├── backend/            # Python Flask API server (NIM Integration)
+├── frontend/           # Main Application (React + Serverless API)
+│   ├── api/            # Vercel Serverless Functions
+│   ├── components/     # React UI Components
+│   └── services/       # Frontend Logic
+├── backend/            # (Legacy) Python Flask API server
 └── ARCHITECTURE.md     # This documentation
 ```
 
-## 1. Frontend Service
+## 1. Frontend Service (The Core)
 
-The frontend is a modern Single Page Application (SPA) built with React.
+The application is a Single Page Application (SPA) built with React.
 
 - **Directory:** `frontend/`
 - **Framework:** React 19 (Vite)
 - **Language:** TypeScript
-- **State Management:** React Hooks (`useState`, `useEffect`) + LocalStorage
-- **Styling:** Tailwind CSS (via CDN)
-- **Running Port:** `http://localhost:3000` (Default)
+- **State Management:** React Hooks + LocalStorage
+- **Styling:** Tailwind CSS
+- **Deployment:** Vercel
 
 ### Key Components
-- **`frontend/components/ChatWindow.tsx`**: The core chat interface handling message display, markdown rendering, and user input.
-- **`frontend/services/geminiService.ts`**: The API client. Connects to the NIM backend.
-  - **Configuration:** Reads `VITE_BACKEND_URL` environment variable. Defaults to `http://localhost:5000/api/nim-chat`.
+- **`frontend/components/ChatWindow.tsx`**: Handles chat UI, markdown rendering, and user input.
+- **`frontend/services/geminiService.ts`**: The intelligent service layer that switches logic based on the environment:
+  - **Development:** Calls local Vite proxy (`/nim-api/chat/completions`) using client-side key.
+  - **Production:** Calls Vercel Serverless Function (`/api/nim`) to keep the key secure.
 
-### Setup & Run
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## 2. Serverless API (Production Backend)
 
-## 2. Backend Service (Production)
+Instead of a standalone backend server, we use Vercel Edge Functions to secure the API key.
 
-The backend is a Flask server that acts as a secure proxy to NVIDIA's NIM API.
-
-- **Directory:** `backend/`
-- **File:** `backend/app_nim.py` (Production Entry Point)
-- **Framework:** Flask
-- **Language:** Python 3
-- **Running Port:** `http://localhost:5000` (Default)
-- **Provider:** NVIDIA NIM (via `integrate.api.nvidia.com`)
-
-### Key Files
-- **`backend/app_nim.py`**: The main server entry point for production.
-- **`backend/.env.backend`**: Configuration file containing secrets.
-- **`backend/requirements.txt`**: Python dependencies (`flask`, `flask-cors`, `requests`, `python-dotenv`).
-
-### Configuration
-The backend requires a `.env.backend` file in the `backend/` directory with the following key:
-```env
-NIM_KEY=nvapi-...
-```
-
-### Setup & Run
-```bash
-cd backend
-# Recommended: Create a virtual environment
-# python -m venv venv
-# source venv/bin/activate  # or venv\Scripts\activate on Windows
-
-pip install -r requirements.txt
-python app_nim.py
-```
+- **File:** `frontend/api/nim.js`
+- **Runtime:** Vercel Edge Runtime
+- **Purpose:** Receives requests from the frontend, injects the `NIM_KEY` (from server env vars), and proxies the request to NVIDIA.
 
 ## 3. Integration Data Flow
 
-1.  **User Input:** User types a message in the Frontend `ChatWindow`.
-2.  **API Call:** `geminiService` sends a `POST` request to `http://localhost:5000/api/nim-chat`.
-    -   Payload: `{ "messages": [ {"role": "system", "content": "..."}, {"role": "user", "content": "..."} ] }`
-3.  **Proxy:** Backend (`app_nim.py`) receives the request.
-4.  **NIM Processing:** Backend forwards the request to NVIDIA NIM API using the `NIM_KEY`.
-5.  **Streaming:** Backend streams the text chunks back to the Frontend via Server-Sent Events (SSE) logic.
-6.  **Display:** Frontend accumulates chunks and renders Markdown in real-time.
+### A. Local Development Flow
+1.  **Browser:** Sends request to `http://localhost:3000/nim-api/chat/completions`.
+2.  **Vite Proxy:** Rewrites URL -> `https://integrate.api.nvidia.com/v1/chat/completions`.
+3.  **Authentication:** Uses `VITE_NIM_KEY` from local `.env`.
+4.  **Response:** Streams directly back to the browser.
 
-## 4. Deployment
+### B. Production Flow (Vercel)
+1.  **Browser:** Sends request to `/api/nim` (Relative URL).
+2.  **Vercel Edge Function (`api/nim.js`):**
+    -   Intercepts request.
+    -   Reads `NIM_KEY` from secure Vercel Environment Variables.
+    -   Forwards request to NVIDIA NIM API.
+3.  **NVIDIA:** Processes request and streams response.
+4.  **Edge Function:** Streams the response back to the client.
 
--   **Frontend:** Deploy to Vercel, Netlify, or similar. Set `VITE_BACKEND_URL` to your production backend URL.
--   **Backend:** Deploy `app_nim.py` to a container service (Cloud Run, Docker, etc.). Ensure `NIM_KEY` is set as an environment variable.
+## 4. Environment Variables
+
+| Variable | Scope | Description |
+| :--- | :--- | :--- |
+| `VITE_NIM_KEY` | Local Dev | Your NVIDIA API Key (in `frontend/.env`). |
+| `VITE_AI_PROVIDER` | Frontend | Set to `nim`. |
+| `NIM_KEY` | Production | Your NVIDIA API Key (Set in Vercel Settings). |
+
+## 5. Legacy Backend
+The `backend/` folder contains the original Python Flask implementation. It is currently **not used** in the deployed Vercel version but serves as a reference or alternative deployment option (e.g., for Docker/Cloud Run).

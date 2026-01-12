@@ -1,6 +1,8 @@
 # NutriAI - Your Personal AI Nutritionist
 
-NutriAI is a full-stack web application designed to provide personalized nutrition and lifestyle advice. It leverages the power of **NVIDIA NIM (Nutrition Intelligence Model)** to generate evidence-based, empathetic, and context-aware responses based on user profiles.
+**Live Demo:** [https://nutri-ai-bot.vercel.app/](https://nutri-ai-bot.vercel.app/)
+
+NutriAI is a web application designed to provide personalized nutrition and lifestyle advice. It leverages the power of **NVIDIA NIM** (via the `meta/llama-4-maverick-17b-128e-instruct` model) to generate evidence-based, empathetic, and context-aware responses based on user profiles.
 
 ## 🚀 Features
 
@@ -12,67 +14,20 @@ NutriAI is a full-stack web application designed to provide personalized nutriti
 
 ## 🛠️ Tech Stack
 
-- **Frontend:**
-  - React 19
-  - TypeScript
-  - Vite
-  - Tailwind CSS
-- **Backend:**
-  - Python 3
-  - Flask
-  - NVIDIA NIM API Integration
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
+- **API Proxy:** Vercel Edge Functions (Serverless)
+- **AI Model:** NVIDIA NIM (Llama 4 Maverick)
 
 ## 📋 Prerequisites
 
 - **Node.js** (v18 or higher)
-- **Python** (v3.9 or higher)
 - **NVIDIA NIM API Key**
 
 ## ⚙️ Installation & Setup
 
-The project is divided into two separate services: `frontend` and `backend`.
+This project uses a serverless architecture. The `frontend` folder contains everything needed for both local development and deployment. The Python `backend` folder is legacy/optional and not required for the Vercel deployment.
 
-### 1. Backend Setup
-
-The backend acts as a secure proxy to the NVIDIA NIM API.
-
-1.  Navigate to the backend directory:
-    ```bash
-    cd backend
-    ```
-
-2.  Create a virtual environment (recommended):
-    ```bash
-    # Windows
-    python -m venv venv
-    venv\Scripts\activate
-
-    # macOS/Linux
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-
-3.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  Configure environment variables:
-    -   Create a file named `.env.backend` in the `backend/` directory.
-    -   Add your NVIDIA NIM API key:
-        ```env
-        NIM_KEY=nvapi-your-key-here
-        ```
-
-5.  Start the server:
-    ```bash
-    python app_nim.py
-    ```
-    The backend will run on `http://localhost:5000`.
-
-### 2. Frontend Setup
-
-The frontend is a React application that connects to the backend.
+### Local Development
 
 1.  Navigate to the frontend directory:
     ```bash
@@ -84,31 +39,43 @@ The frontend is a React application that connects to the backend.
     npm install
     ```
 
-3.  Start the development server:
+3.  Configure environment variables:
+    -   Create a `.env` file in the `frontend/` directory.
+    -   Add your NVIDIA NIM API key:
+        ```env
+        VITE_NIM_KEY=nvapi-your-key-here
+        VITE_AI_PROVIDER=nim
+        ```
+
+4.  Start the development server:
     ```bash
     npm run dev
     ```
-    The frontend will run on `http://localhost:3000`.
+    The application will run on `http://localhost:3000`.
 
-## 🏃‍♂️ Running the Application
+    *Note: In development, the app uses a Vite proxy (`/nim-api`) to call the NVIDIA API directly, bypassing CORS.*
 
-1.  Ensure the **Backend** is running (`python app_nim.py`).
-2.  Ensure the **Frontend** is running (`npm run dev`).
-3.  Open your browser and navigate to `http://localhost:3000`.
-4.  Complete the onboarding process and start chatting with your AI Nutritionist!
+## 🚀 Deployment (Vercel)
+
+The application is optimized for Vercel.
+
+1.  **Push to GitHub.**
+2.  **Import to Vercel:**
+    -   Set **Root Directory** to `frontend`.
+    -   **Framework Preset:** Vite.
+3.  **Environment Variables:**
+    -   Add `NIM_KEY` (Your NVIDIA API Key). *Note: `VITE_NIM_KEY` is not required in production as the serverless function handles the key.*
 
 ## 📂 Project Structure
 
 ```text
 /
-├── frontend/           # React + TypeScript Client
-│   ├── components/     # UI Components (ChatWindow, Onboarding, etc.)
+├── frontend/           # React App & Serverless Functions
+│   ├── api/            # Vercel Serverless Functions (nim.js)
+│   ├── components/     # UI Components
 │   ├── services/       # API Integration (geminiService.ts)
 │   └── ...
-├── backend/            # Python Flask Server
-│   ├── app_nim.py      # Production Server (NVIDIA NIM)
-│   ├── requirements.txt
-│   └── ...
+├── backend/            # (Legacy) Python Flask Server
 └── ARCHITECTURE.md     # Detailed Architectural Documentation
 ```
 
