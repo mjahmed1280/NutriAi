@@ -11,17 +11,20 @@ NutriAI is a web application designed to provide personalized nutrition and life
 - **Interactive UI:** Modern, responsive design built with React and Tailwind CSS.
 - **Context Awareness:** The AI remembers your profile and conversation context to provide relevant suggestions.
 - **Suggestion Engine:** Automatically generates follow-up questions or topic suggestions.
+- **Rate Limiting:** Enforces a global daily limit of 50 API calls to manage costs.
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
 - **API Proxy:** Vercel Edge Functions (Serverless)
 - **AI Model:** NVIDIA NIM (Llama 4 Maverick)
+- **Database:** Vercel KV (Upstash Redis) for Rate Limiting
 
 ## 📋 Prerequisites
 
 - **Node.js** (v18 or higher)
 - **NVIDIA NIM API Key**
+- **Vercel KV Store** (for production rate limiting)
 
 ## ⚙️ Installation & Setup
 
@@ -53,7 +56,7 @@ This project uses a serverless architecture. The `frontend` folder contains ever
     ```
     The application will run on `http://localhost:3000`.
 
-    *Note: In development, the app uses a Vite proxy (`/nim-api`) to call the NVIDIA API directly, bypassing CORS.*
+    *Note: In development, the app uses a Vite proxy (`/nim-api`) to call the NVIDIA API directly, bypassing CORS and Rate Limiting.*
 
 ## 🚀 Deployment (Vercel)
 
@@ -63,8 +66,10 @@ The application is optimized for Vercel.
 2.  **Import to Vercel:**
     -   Set **Root Directory** to `frontend`.
     -   **Framework Preset:** Vite.
-3.  **Environment Variables:**
-    -   Add `NIM_KEY` (Your NVIDIA API Key). *Note: `VITE_NIM_KEY` is not required in production as the serverless function handles the key.*
+3.  **Integrations:**
+    -   Connect a **Vercel KV** store (Storage tab) to your project. This automatically sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+4.  **Environment Variables:**
+    -   Add `NIM_KEY` (Your NVIDIA API Key).
 
 ## 📂 Project Structure
 
