@@ -4,6 +4,8 @@ export class GeminiService {
   private backendUrl: string =
     import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:5000/api/nim-chat";
 
+  private provider: string = import.meta.env.VITE_AI_PROVIDER || "nim";
+
   private currentHistory: { role: string; content: string }[] = [];
   private hasSentInitialSystemMessage = false;
   private profile: UserProfile | null = null;
@@ -75,31 +77,104 @@ export class GeminiService {
     // Add the latest user message to history
     this.currentHistory.push({ role: "user", content: text });
 
-    // Make backend call
-    const response = await fetch(this.backendUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: this.currentHistory,
-      }),
-    });
-
-    if (!response.body) {
-      onChunk("⚠️ No streaming body from backend.");
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
     let assistantReply = "";
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        assistantReply += chunk;
-        onChunk(chunk);
+      if (this.provider === "gemini") {
+        // Make backend call
+        const response = await fetch(this.backendUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: this.currentHistory,
+          }),
+        });
+
+        if (!response.body) {
+          onChunk("⚠️ No streaming body from backend.");
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          assistantReply += chunk;
+          onChunk(chunk);
+        }
+      } else {
+        // Direct NIM call (proxied via Vite for CORS)
+        const INVOKE_URL = "/nim-api/chat/completions";
+        const MODEL_NAME = "meta/llama-4-maverick-17b-128e-instruct";
+        const apiKey = import.meta.env.VITE_NIM_KEY;
+        // console.log("heyyyy----")
+        // console.log("VITE_NIM_KEY:", import.meta.env.VITE_NIM_KEY);
+        if (!apiKey) {
+          throw new Error("Missing NIM_KEY. Check your .env file.");
+        }
+
+        const response = await fetch(INVOKE_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+            "Accept": "text/event-stream"
+          },
+          body: JSON.stringify({
+            model: MODEL_NAME,
+            messages: this.currentHistory,
+            stream: true,
+            max_tokens: 1024,
+            temperature: 0.5,
+            top_p: 1.0
+          }),
+        });
+
+        if (!response.ok) {
+           const errText = await response.text();
+           throw new Error(`NIM API Error: ${response.status} ${response.statusText} - ${errText}`);
+        }
+
+        if (!response.body) {
+          onChunk("⚠️ No streaming body from NIM API.");
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            
+            const dataStr = trimmed.slice(6).trim();
+            if (dataStr === "[DONE]") continue;
+
+            try {
+              const data = JSON.parse(dataStr);
+              const content = data.choices?.[0]?.delta?.content;
+              if (content) {
+                assistantReply += content;
+                onChunk(content);
+              }
+            } catch (e) {
+              console.error("Error parsing SSE:", e);
+            }
+          }
+        }
       }
 
       // Store assistant reply in history
