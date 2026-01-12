@@ -106,25 +106,27 @@ export class GeminiService {
           onChunk(chunk);
         }
       } else {
-        // Direct NIM call (proxied via Vite for CORS)
-        const INVOKE_URL = "/nim-api/chat/completions";
-        const MODEL_NAME = "meta/llama-4-maverick-17b-128e-instruct";
-        const apiKey = import.meta.env.VITE_NIM_KEY;
-        // console.log("heyyyy----")
-        // console.log("VITE_NIM_KEY:", import.meta.env.VITE_NIM_KEY);
-        if (!apiKey) {
-          throw new Error("Missing NIM_KEY. Check your .env file.");
+        // Direct NIM call logic
+        const isDev = import.meta.env.DEV;
+        let invokeUrl = "/api/nim"; // Production URL (Vercel Function)
+        let headers: Record<string, string> = { "Content-Type": "application/json" };
+        
+        // Development Configuration (Local Proxy)
+        if (isDev) {
+            invokeUrl = "/nim-api/chat/completions";
+            const apiKey = import.meta.env.VITE_NIM_KEY;
+            if (!apiKey) {
+                throw new Error("Missing NIM_KEY. Check your .env file.");
+            }
+            headers["Authorization"] = `Bearer ${apiKey}`;
+            headers["Accept"] = "text/event-stream";
         }
 
-        const response = await fetch(INVOKE_URL, {
+        const response = await fetch(invokeUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-            "Accept": "text/event-stream"
-          },
+          headers: headers,
           body: JSON.stringify({
-            model: MODEL_NAME,
+            model: "meta/llama-4-maverick-17b-128e-instruct",
             messages: this.currentHistory,
             stream: true,
             max_tokens: 1024,
@@ -135,11 +137,11 @@ export class GeminiService {
 
         if (!response.ok) {
            const errText = await response.text();
-           throw new Error(`NIM API Error: ${response.status} ${response.statusText} - ${errText}`);
+           throw new Error(`API Error: ${response.status} ${response.statusText} - ${errText}`);
         }
 
         if (!response.body) {
-          onChunk("⚠️ No streaming body from NIM API.");
+          onChunk("⚠️ No streaming body from API.");
           return;
         }
 
