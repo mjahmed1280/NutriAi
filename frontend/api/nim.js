@@ -8,6 +8,56 @@ export default async function handler(req) {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
+  // Basic Security: Origin Check
+  const origin = req.headers.get('origin') || req.headers.get('referer');
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || 'vercel.app';
+  
+  if (origin && !origin.includes('localhost') && !origin.includes(allowedOrigin)) {
+      return new Response('Forbidden: Invalid Origin', { status: 403 });
+  }
+
+  // ---------------------------------------------------------
+  // Rate Limiting (Global Daily Limit: 50) via Vercel KV (Upstash)
+  // ---------------------------------------------------------
+  // Try specific store variables first, then fallback to generic defaults
+  const KV_URL = process.env.ratelimitstore_KV_REST_API_URL || process.env.KV_REST_API_URL;
+  const KV_TOKEN = process.env.ratelimitstore_KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN;
+
+  if (KV_URL && KV_TOKEN) {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const key = `nutriai_global_limit_${today}`;
+      
+      // 1. Increment the counter
+      const incrRes = await fetch(`${KV_URL}/INCR/${key}`, {
+        headers: { Authorization: `Bearer ${KV_TOKEN}` }
+      });
+      const { result: currentCount } = await incrRes.json();
+
+      // 2. If this is the first request of the day, set expiry (24h)
+      if (currentCount === 1) {
+        // Run in background (fire and forget) to save latency
+        fetch(`${KV_URL}/EXPIRE/${key}/86400`, {
+          headers: { Authorization: `Bearer ${KV_TOKEN}` }
+        });
+      }
+
+      // 3. Check Limit
+      if (currentCount > 50) {
+        return new Response(
+          JSON.stringify({ error: "Daily API Limit Exceeded (50/50). Please try again tomorrow." }), 
+          { 
+            status: 429, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    } catch (kvError) {
+      console.error("Rate limit check failed:", kvError);
+      // Fail open: If DB is down, allow request to proceed
+    }
+  }
+
   try {
     const { messages, model, max_tokens, temperature, top_p } = await req.json();
 

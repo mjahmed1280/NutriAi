@@ -15,7 +15,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ profile, initialHistory, onHist
   const [messages, setMessages] = useState<Message[]>(initialHistory);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [lastSent, setLastSent] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const COOLDOWN_MS = 3000;
 
   useEffect(() => {
     geminiService.startChat(profile, initialHistory);
@@ -65,10 +68,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ profile, initialHistory, onHist
   };
 
   const handleSend = async (customText?: string) => {
+    const now = Date.now();
+    if (now - lastSent < COOLDOWN_MS) return;
+
     const textToSend = customText || input.trim();
     if (!textToSend || isTyping) return;
 
     if (!customText) setInput('');
+    setLastSent(now);
     
     const userMessage: Message = {
       id: Date.now().toString(),

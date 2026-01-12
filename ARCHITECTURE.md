@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a **Serverless Full-Stack Chat Application** powered by **NVIDIA NIM**. It uses a modern React frontend hosted on Vercel, utilizing Vercel Edge Functions to securely proxy API requests to NVIDIA's inference endpoints.
+This project is a **Serverless Full-Stack Chat Application** powered by **NVIDIA NIM**. It uses a modern React frontend hosted on Vercel, utilizing Vercel Edge Functions to securely proxy API requests to NVIDIA's inference endpoints and Vercel KV for rate limiting.
 
 ## Directory Structure
 
@@ -39,7 +39,7 @@ Instead of a standalone backend server, we use Vercel Edge Functions to secure t
 
 - **File:** `frontend/api/nim.js`
 - **Runtime:** Vercel Edge Runtime
-- **Purpose:** Receives requests from the frontend, injects the `NIM_KEY` (from server env vars), and proxies the request to NVIDIA.
+- **Purpose:** Receives requests from the frontend, injects the `NIM_KEY`, checks Rate Limits via KV, and proxies the request to NVIDIA.
 
 ## 3. Integration Data Flow
 
@@ -48,13 +48,19 @@ Instead of a standalone backend server, we use Vercel Edge Functions to secure t
 2.  **Vite Proxy:** Rewrites URL -> `https://integrate.api.nvidia.com/v1/chat/completions`.
 3.  **Authentication:** Uses `VITE_NIM_KEY` from local `.env`.
 4.  **Response:** Streams directly back to the browser.
+    *   *Note: Rate limiting is bypassed in local dev.*
 
 ### B. Production Flow (Vercel)
 1.  **Browser:** Sends request to `/api/nim` (Relative URL).
 2.  **Vercel Edge Function (`api/nim.js`):**
-    -   Intercepts request.
-    -   Reads `NIM_KEY` from secure Vercel Environment Variables.
-    -   Forwards request to NVIDIA NIM API.
+    -   **Security Check:** Verifies Origin/Referer.
+    -   **Rate Limit Check:**
+        -   Connects to Vercel KV (Upstash Redis).
+        -   Increments daily counter: `nutriai_global_limit_{YYYY-MM-DD}`.
+        -   If > 50, returns `429 Too Many Requests`.
+    -   **NIM Proxy:**
+        -   Reads `NIM_KEY` from secure Vercel Environment Variables.
+        -   Forwards request to NVIDIA NIM API.
 3.  **NVIDIA:** Processes request and streams response.
 4.  **Edge Function:** Streams the response back to the client.
 
@@ -65,6 +71,8 @@ Instead of a standalone backend server, we use Vercel Edge Functions to secure t
 | `VITE_NIM_KEY` | Local Dev | Your NVIDIA API Key (in `frontend/.env`). |
 | `VITE_AI_PROVIDER` | Frontend | Set to `nim`. |
 | `NIM_KEY` | Production | Your NVIDIA API Key (Set in Vercel Settings). |
+| `ratelimitstore_KV_REST_API_URL` | Production | Vercel KV Connection URL (from 'ratelimitstore' integration). |
+| `ratelimitstore_KV_REST_API_TOKEN` | Production | Vercel KV Auth Token (from 'ratelimitstore' integration). |
 
 ## 5. Legacy Backend
 The `backend/` folder contains the original Python Flask implementation. It is currently **not used** in the deployed Vercel version but serves as a reference or alternative deployment option (e.g., for Docker/Cloud Run).
