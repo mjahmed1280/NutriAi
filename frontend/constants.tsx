@@ -1,6 +1,4 @@
 
-import React from 'react';
-
 export const APP_NAME = 'NutriAI';
 
 export const ICONS = {

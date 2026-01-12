@@ -7,7 +7,6 @@ export class GeminiService {
   private provider: string = import.meta.env.VITE_AI_PROVIDER || "nim";
 
   private currentHistory: { role: string; content: string }[] = [];
-  private hasSentInitialSystemMessage = false;
   private profile: UserProfile | null = null;
 
   constructor() {}
@@ -30,8 +29,6 @@ export class GeminiService {
         content: msg.text,
       });
     });
-
-    this.hasSentInitialSystemMessage = true;
   }
 
   private buildSystemInstruction(profile: UserProfile): string {
@@ -65,7 +62,6 @@ export class GeminiService {
   public async clearSession() {
     this.currentHistory = [];
     this.profile = null;
-    this.hasSentInitialSystemMessage = false;
   }
 
   public async sendMessageStream(
