@@ -49,3 +49,15 @@ export interface ChatState {
   messages: Message[];
   isLoading: boolean;
 }
+
+export interface HealthMetrics {
+  bmi: number;
+  bmiCategory: 'Underweight' | 'Normal' | 'Overweight' | 'Obese';
+  bodyFatPercentage: number; // Est
+  visceralFat: number; // 1-20
+  bmr: number;
+  metabolicAge: number; // calculated relative to actual age
+  idealWeightRange: string; // e.g. "65kg - 75kg"
+  waterIntake: number; // glasses
+  actionItems: string[]; // AI generated
+}

@@ -4,6 +4,9 @@
 
 NutriAI is a web application designed to provide personalized nutrition and lifestyle advice. It leverages the power of **NVIDIA NIM** (via the `meta/llama-4-maverick-17b-128e-instruct` model) to generate evidence-based, empathetic, and context-aware responses based on user profiles.
 
+#### 📸 ScreenShort
+![alt text](image.png)
+
 ## 🚀 Features
 
 - **Personalized Onboarding:** Collects user details like age, goals, dietary preferences, and allergies to tailor advice.
@@ -68,6 +71,7 @@ The application is optimized for Vercel.
     -   **Framework Preset:** Vite.
 3.  **Integrations:**
     -   Connect a **Vercel KV** store (Storage tab) to your project. This automatically sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+    ![alt text](image-1.png)
 4.  **Environment Variables:**
     -   Add `NIM_KEY` (Your NVIDIA API Key).
 

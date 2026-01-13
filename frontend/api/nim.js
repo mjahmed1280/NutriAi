@@ -17,7 +17,7 @@ export default async function handler(req) {
   }
 
   // ---------------------------------------------------------
-  // Rate Limiting (Global Daily Limit: 50) via Vercel KV (Upstash)
+  // Rate Limiting (Global Daily Limit: 30) via Vercel KV (Upstash)
   // ---------------------------------------------------------
   // Try specific store variables first, then fallback to generic defaults
   const KV_URL = process.env.ratelimitstore_KV_REST_API_URL || process.env.KV_REST_API_URL;
@@ -43,9 +43,9 @@ export default async function handler(req) {
       }
 
       // 3. Check Limit
-      if (currentCount > 50) {
+      if (currentCount > 30) {
         return new Response(
-          JSON.stringify({ error: "Daily API Limit Exceeded (50/50). Please try again tomorrow." }), 
+          JSON.stringify({ error: "Daily API Limit Exceeded (30/30). Please try again tomorrow." }), 
           { 
             status: 429, 
             headers: { 'Content-Type': 'application/json' } 

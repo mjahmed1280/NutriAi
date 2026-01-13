@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Onboarding from './components/Onboarding';
 import ChatWindow from './components/ChatWindow';
 import ConfirmationModal from './components/ConfirmationModal';
+import HealthSidebar from './components/HealthSidebar';
 import { UserProfile, Message } from './types';
 import { geminiService } from './services/geminiService';
 import { STORAGE_KEYS } from './constants';
@@ -11,6 +12,7 @@ function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [history, setHistory] = useState<Message[]>([]);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default closed
   const [key, setKey] = useState(0); // To force re-render components on reset/new chat
 
   useEffect(() => {
@@ -20,6 +22,7 @@ function App() {
 
     if (savedProfile) {
       setProfile(JSON.parse(savedProfile));
+      setIsSidebarOpen(true); // Open sidebar by default if profile exists
     }
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
@@ -29,6 +32,7 @@ function App() {
   const handleOnboardingComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
     localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(newProfile));
+    setIsSidebarOpen(true);
   };
 
   const handleHistoryUpdate = (messages: Message[]) => {
@@ -53,6 +57,7 @@ function App() {
     localStorage.removeItem(STORAGE_KEYS.CHAT_HISTORY);
     setProfile(null);
     setHistory([]);
+    setIsSidebarOpen(false);
     setShowResetModal(false);
     setKey(prev => prev + 1);
   };
@@ -75,6 +80,13 @@ function App() {
           />
         )}
       </Layout>
+
+      {/* Right Sidebar - only show if profile exists */}
+      <HealthSidebar 
+        profile={profile} 
+        isOpen={isSidebarOpen} 
+        toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+      />
 
       <ConfirmationModal
         isOpen={showResetModal}
