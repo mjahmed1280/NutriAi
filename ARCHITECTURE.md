@@ -76,3 +76,5 @@ Instead of a standalone backend server, we use Vercel Edge Functions to secure t
 
 ## 5. Legacy Backend
 The `backend/` folder contains the original Python Flask implementation. It is currently **not used** in the deployed Vercel version but serves as a reference or alternative deployment option (e.g., for Docker/Cloud Run).
+
+refrence dial image : ![alt text](image-2.png)
