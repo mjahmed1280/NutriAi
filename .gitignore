@@ -26,3 +26,5 @@ dist-ssr
 sa-vertexai.json
 .env.*
 .env*
+
+.claude

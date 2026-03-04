@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ──────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --brand: #22C55E;
+    --brand-dark: #04090A;
+    --brand-forest: #0D1F14;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-body antialiased bg-[#04090A] text-[#F0FDF4];
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(34, 197, 94, 0.25);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(34, 197, 94, 0.45);
+  }
+}
+
+/* ─── Components ─────────────────────────────────────────────────────────── */
+@layer components {
+  /* Shimmer loading bar */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2.5s linear infinite;
+  }
+
+  /* Animated gradient border */
+  .gradient-border {
+    position: relative;
+    background: linear-gradient(var(--brand-forest), var(--brand-forest)) padding-box,
+      linear-gradient(135deg, #22C55E, #14B8A6, #22C55E) border-box;
+    border: 1.5px solid transparent;
+    background-size: 200% 200%;
+    animation: gradient-x 4s ease infinite;
+  }
+
+  /* Glass card */
+  .glass {
+    @apply backdrop-blur-xl bg-white/5 border border-white/10;
+  }
+
+  .glass-light {
+    @apply backdrop-blur-xl bg-white/80 border border-white/60;
+  }
+
+  /* Glow button */
+  .btn-glow {
+    @apply relative overflow-hidden;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    transition: box-shadow 0.3s ease;
+  }
+  .btn-glow:hover {
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.4), 0 4px 16px rgba(34, 197, 94, 0.2);
+  }
+
+  /* Scanning animation overlay */
+  .scanning-bar {
+    position: relative;
+    overflow: hidden;
+  }
+  .scanning-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.3), transparent);
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  /* Ambient orb */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    animation: orb 8s ease-in-out infinite;
+  }
+
+  /* Typewriter cursor */
+  .cursor::after {
+    content: '|';
+    animation: blink 1s step-end infinite;
+    color: #22C55E;
+    margin-left: 2px;
+  }
+
+  /* Tag chip */
+  .tag-chip {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold
+           bg-emerald-950/60 text-emerald-300 border border-emerald-800/60;
+  }
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+}
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ─── Print — downloadable meal/diet cards ───────────────────────────────── */
+@media print {
+  body > * { display: none !important; }
+  [data-print-target] {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    color: #111827;
+    padding: 2rem;
+    z-index: 9999;
+    overflow: auto;
+  }
+}

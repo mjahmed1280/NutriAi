@@ -37,10 +37,25 @@ export interface UserProfile {
   isCompleted: boolean;
 }
 
+export interface MacroData {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  dish?: string;
+  serving?: string;
+  health_score?: number;      // 0–10
+  ingredients?: string[];
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'model';
   text: string;
+  imageBase64?: string;
+  imageMimeType?: string;
+  macros?: MacroData;
   timestamp: number;
   suggestions?: string[];
 }

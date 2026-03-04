@@ -1,312 +1,404 @@
+import React, { useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, ChevronRight, Flame, Dumbbell, Activity } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
+import { HealthMetrics } from '../types';
+import { cn } from '../lib/utils';
 
-import React, { useState, useEffect } from 'react';
-import { UserProfile, HealthMetrics } from '../types';
-import { ICONS } from '../constants';
+// ── BMI Linear Bar Gauge ────────────────────────────────────────────────────────
+const BMIGauge: React.FC<{ bmi: number; category: string }> = ({ bmi, category }) => {
+  // Zone definitions: [bmiStart, bmiEnd] → bar [barStart%, barEnd%]
+  const zones = [
+    { label: 'UNDER',  bmiMin: 15,   bmiMax: 18.5, barMin: 0,  barMax: 15,  color: '#6366F1', bg: 'bg-[#6366F1]' },
+    { label: 'NORMAL', bmiMin: 18.5, bmiMax: 25,   barMin: 15, barMax: 45,  color: '#22C55E', bg: 'bg-[#22C55E]' },
+    { label: 'OVER',   bmiMin: 25,   bmiMax: 30,   barMin: 45, barMax: 70,  color: '#F59E0B', bg: 'bg-[#F59E0B]' },
+    { label: 'OBESE',  bmiMin: 30,   bmiMax: 40,   barMin: 70, barMax: 100, color: '#EF4444', bg: 'bg-[#EF4444]' },
+  ];
 
-interface HealthSidebarProps {
-  profile: UserProfile | null;
-  isOpen: boolean;
-  toggleSidebar: () => void;
+  const catColor =
+    category === 'Normal'      ? '#22C55E'
+    : category === 'Overweight' ? '#F59E0B'
+    : category === 'Underweight'? '#6366F1'
+    : '#EF4444';
+
+  // Zone-aware needle position: interpolate within the active zone's bar range
+  const clampedBmi = Math.min(Math.max(bmi, 15), 40);
+  const activeZone = zones.find((z) => clampedBmi >= z.bmiMin && clampedBmi <= z.bmiMax) ?? zones[zones.length - 1];
+  const needlePct = activeZone.barMin + ((clampedBmi - activeZone.bmiMin) / (activeZone.bmiMax - activeZone.bmiMin)) * (activeZone.barMax - activeZone.barMin);
+
+  return (
+    <div className="mt-3">
+      {/* BMI number + category */}
+      <div className="text-center mb-4">
+        <span className="font-mono font-bold text-4xl leading-none" style={{ color: catColor }}>
+          {bmi}
+        </span>
+        <p className="text-[10px] font-semibold tracking-[0.18em] mt-1" style={{ color: catColor + 'BB' }}>
+          {category.toUpperCase()}
+        </p>
+      </div>
+
+      {/* Bar + needle wrapper */}
+      <div className="relative">
+        {/* Needle */}
+        <div
+          className="absolute -top-2 z-10 flex flex-col items-center"
+          style={{ left: `${needlePct}%`, transform: 'translateX(-50%)' }}
+        >
+          {/* Needle triangle pointing down */}
+          <div className="w-0 h-0" style={{
+            borderLeft: '4px solid transparent',
+            borderRight: '4px solid transparent',
+            borderTop: `6px solid ${catColor}`,
+            filter: `drop-shadow(0 0 4px ${catColor})`,
+          }} />
+        </div>
+
+        {/* Coloured segments */}
+        <div className="flex h-3 rounded-full overflow-hidden gap-[2px]">
+          {zones.map((z, i) => (
+            <div
+              key={z.label}
+              className={z.bg}
+              style={{
+                width: `${z.barMax - z.barMin}%`,
+                opacity: z.color === activeZone.color ? 1 : 0.28,
+                borderRadius:
+                  i === 0 ? '9999px 0 0 9999px'
+                  : i === zones.length - 1 ? '0 9999px 9999px 0'
+                  : '0',
+                boxShadow: z.color === activeZone.color ? `0 0 8px ${z.color}80` : 'none',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Zone labels below bar */}
+        <div className="flex mt-1.5">
+          {zones.map((z) => (
+            <div
+              key={z.label}
+              className="text-center"
+              style={{ width: `${z.barMax - z.barMin}%` }}
+            >
+              <span
+                className="text-[8px] font-semibold tracking-wider"
+                style={{ color: z.color === activeZone.color ? z.color + 'CC' : '#ffffff25' }}
+              >
+                {z.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Metric calculations ─────────────────────────────────────────────────────────
+function calcMetrics(profile: NonNullable<ReturnType<typeof useAppStore.getState>['profile']>): HealthMetrics {
+  const hm = profile.height / 100;
+  const bmi = profile.weight / (hm * hm);
+
+  let bmiCategory: HealthMetrics['bmiCategory'] = 'Normal';
+  if (bmi < 18.5) bmiCategory = 'Underweight';
+  else if (bmi >= 25 && bmi < 30) bmiCategory = 'Overweight';
+  else if (bmi >= 30) bmiCategory = 'Obese';
+
+  // Mifflin-St Jeor BMR
+  let bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age;
+  bmr += profile.gender === 'Male' ? 5 : -161;
+
+  const sexFactor = profile.gender === 'Male' ? 1 : 0;
+  const bodyFat = 1.2 * bmi + 0.23 * profile.age - 10.8 * sexFactor - 5.4;
+
+  const minW = 18.5 * hm * hm;
+  const maxW = 25 * hm * hm;
+
+  return {
+    bmi: +bmi.toFixed(1),
+    bmiCategory,
+    bodyFatPercentage: +bodyFat.toFixed(1),
+    visceralFat: Math.min(Math.max(Math.round(bmi / 2), 1), 20),
+    bmr: Math.round(bmr),
+    metabolicAge: profile.age,
+    idealWeightRange: `${Math.round(minW)}–${Math.round(maxW)}kg`,
+    waterIntake: 0,
+    actionItems: [],
+  };
 }
 
-const HealthSidebar: React.FC<HealthSidebarProps> = ({ profile, isOpen, toggleSidebar }) => {
-  const [metrics, setMetrics] = useState<HealthMetrics | null>(null);
-  const [waterCount, setWaterCount] = useState(0);
+// Activity multipliers (Harris-Benedict / Mifflin-St Jeor convention)
+const ACT_MULT: Record<string, number> = {
+  'Sedentary': 1.2,
+  'Lightly Active': 1.375,
+  'Moderately Active': 1.55,
+  'Very Active': 1.725,
+  'Extremely Active': 1.9,
+};
 
-  // Calculate Metrics on profile change
-  useEffect(() => {
-    if (!profile) return;
+// ── Main ────────────────────────────────────────────────────────────────────────
+const HealthSidebar: React.FC = () => {
+  const { profile, messages, isSidebarOpen, setSidebarOpen } = useAppStore();
 
-    const heightM = profile.height / 100;
-    const bmi = profile.weight / (heightM * heightM);
-    
-    let bmiCategory: HealthMetrics['bmiCategory'] = 'Normal';
-    if (bmi < 18.5) bmiCategory = 'Underweight';
-    else if (bmi >= 25 && bmi < 30) bmiCategory = 'Overweight';
-    else if (bmi >= 30) bmiCategory = 'Obese';
+  const metrics = useMemo(() => (profile ? calcMetrics(profile) : null), [profile]);
 
-    // Mifflin-St Jeor Equation
-    let bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age;
-    bmr += profile.gender === 'Male' ? 5 : -161;
+  // TDEE-based macro targets — dietitian standard
+  const macros = useMemo(() => {
+    if (!metrics || !profile) return null;
+    const tdee = Math.round(metrics.bmr * (ACT_MULT[profile.activityLevel] ?? 1.55));
 
-    // Rough Body Fat Estimate (Navy Tape measure method requires more inputs, using simple BMI-based approximation for demo)
-    // Adult Body Fat % = (1.20 × BMI) + (0.23 × Age) − (10.8 × sex) − 5.4 
-    // sex: 1 for men, 0 for women
-    const sexFactor = profile.gender === 'Male' ? 1 : 0;
-    const bodyFat = (1.20 * bmi) + (0.23 * profile.age) - (10.8 * sexFactor) - 5.4;
+    // Goal-adjusted calorie target
+    const targetCals =
+      profile.fitnessGoal === 'Weight Loss'          ? Math.max(1200, tdee - 500)
+      : profile.fitnessGoal === 'Muscle Gain'        ? tdee + 250
+      : tdee;
 
-    // Ideal Weight (BMI 18.5 - 25)
-    const minWeight = 18.5 * (heightM * heightM);
-    const maxWeight = 25 * (heightM * heightM);
+    // Protein: evidence-based g/kg by goal
+    // Weight Loss 1.8 g/kg (preserve lean mass) | Muscle Gain 2.0 g/kg | Athletic 1.6 g/kg | Maintenance 1.4 g/kg
+    const ppkg =
+      profile.fitnessGoal === 'Muscle Gain'          ? 2.0
+      : profile.fitnessGoal === 'Weight Loss'        ? 1.8
+      : profile.fitnessGoal === 'Athletic Performance' ? 1.6
+      : 1.4;
 
-    // Metabolic Age (Simplistic heuristic: lower if BMI/BodyFat is good, higher if bad)
-    // Real calculation requires BIA scale.
-    let metabolicAge = profile.age;
-    if (bmiCategory === 'Obese') metabolicAge += 5;
-    if (bmiCategory === 'Overweight') metabolicAge += 2;
-    if (bmiCategory === 'Underweight') metabolicAge += 1;
-    if (bmiCategory === 'Normal') metabolicAge -= 3; // "Younger"
+    const proteinG = Math.round(profile.weight * ppkg);
+    // Fat: 28% of calories (AHA: 25–35%)
+    const fatG = Math.round((targetCals * 0.28) / 9);
+    // Carbs: remainder
+    const carbG = Math.max(0, Math.round((targetCals - proteinG * 4 - fatG * 9) / 4));
 
-    setMetrics({
-      bmi: parseFloat(bmi.toFixed(1)),
-      bmiCategory,
-      bodyFatPercentage: parseFloat(bodyFat.toFixed(1)),
-      visceralFat: Math.min(Math.max(Math.round(bmi / 2), 1), 20), // Placeholder logic
-      bmr: Math.round(bmr),
-      metabolicAge,
-      idealWeightRange: `${Math.round(minWeight)}kg - ${Math.round(maxWeight)}kg`,
-      waterIntake: 0,
-      actionItems: [
-        `Target ${Math.round(bmr * 1.2)} daily calories`,
-        `Aim for ${Math.round(profile.weight * 0.8)}g protein`,
-        "30 mins cardio daily"
-      ]
-    });
-  }, [profile]);
+    return { tdee, targetCals, proteinG, fatG, carbG, ppkg };
+  }, [metrics, profile]);
 
-  if (!profile || !metrics) return null;
+  const todayAnalyses = useMemo(() =>
+    messages
+      .filter((m) => m.role === 'model' && m.macros)
+      .map((m) => ({ id: m.id, macros: m.macros!, label: m.macros!.dish || m.text.slice(0, 36) || 'Food analysis' })),
+    [messages]
+  );
 
-  // Calculate position for the linear slider (15 to 40 scale)
-  const getBmiPosition = (bmi: number) => {
-    const min = 15;
-    const max = 40;
-    const clamped = Math.min(Math.max(bmi, min), max);
-    return ((clamped - min) / (max - min)) * 100;
-  };
+  // Wellness score: BMI (50pts) + activity (30pts) + body fat (20pts)
+  const wellnessScore = useMemo(() => {
+    if (!metrics || !profile) return 0;
+    let s = 0;
+    s += metrics.bmiCategory === 'Normal' ? 50
+       : metrics.bmiCategory === 'Overweight' ? 28
+       : metrics.bmiCategory === 'Underweight' ? 22 : 8;
+    const actMap: Record<string, number> = {
+      'Sedentary': 5, 'Lightly Active': 12,
+      'Moderately Active': 20, 'Very Active': 26, 'Extremely Active': 30,
+    };
+    s += actMap[profile.activityLevel] ?? 15;
+    const bfTarget = profile.gender === 'Male' ? 18 : 25;
+    s += metrics.bodyFatPercentage <= bfTarget ? 20
+       : metrics.bodyFatPercentage <= bfTarget + 7 ? 12 : 4;
+    return Math.min(100, Math.max(0, s));
+  }, [metrics, profile]);
+
+  const wellnessColor = wellnessScore >= 70 ? '#22C55E' : wellnessScore >= 45 ? '#F59E0B' : '#EF4444';
+
+  if (!profile || !metrics || !macros) return null;
+
+  const macroRows = [
+    { label: 'Protein', g: macros.proteinG, color: '#3B82F6', calPct: (macros.proteinG * 4 / macros.targetCals) * 100 },
+    { label: 'Carbs',   g: macros.carbG,    color: '#F59E0B', calPct: (macros.carbG   * 4 / macros.targetCals) * 100 },
+    { label: 'Fat',     g: macros.fatG,     color: '#8B5CF6', calPct: (macros.fatG    * 9 / macros.targetCals) * 100 },
+  ];
 
   return (
     <>
-      {/* Mobile Overlay Backdrop */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/20 z-30 md:hidden backdrop-blur-sm"
-          onClick={toggleSidebar}
-        />
-      )}
+      {/* Mobile backdrop */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Toggle Button (Visible when collapsed) */}
-      {!isOpen && (
-        <button
-          onClick={toggleSidebar}
-          className="fixed right-0 top-24 z-40 bg-white border border-r-0 border-gray-200 shadow-lg rounded-l-xl p-2 text-emerald-600 hover:bg-gray-50 transition-transform hover:-translate-x-1"
-          title="Open Health Insights"
-        >
-          <ICONS.Leaf className="w-6 h-6" />
-        </button>
-      )}
+      {/* Sidebar */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.aside
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 38 }}
+            className="fixed md:relative left-0 top-0 h-full w-[30%] min-w-64 bg-[#08110D] border-r border-white/6 z-40 flex flex-col overflow-hidden"
+          >
+            {/* ── Profile card ─────────────────────────────────────────────── */}
+            <div className="shrink-0 px-5 py-4 border-b border-white/6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-emerald-400">{profile.name.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#F0FDF4] truncate">{profile.name}</p>
+                    <p className="text-xs text-white/40">{profile.age}y · {profile.gender}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 flex items-center justify-center transition-all shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              </div>
 
-      {/* Sidebar Container */}
-      <aside 
-        className={`fixed md:absolute right-0 top-0 h-full bg-white z-40 transition-all duration-300 ease-in-out shadow-2xl border-l border-emerald-100 flex flex-col
-          ${isOpen ? 'translate-x-0 w-80' : 'translate-x-full w-0 opacity-0 pointer-events-none'}
-        `}
-      >
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-gray-800 text-lg">Health Insights</h2>
-              <p className="text-xs text-gray-500">{profile.name} • {profile.fitnessGoal}</p>
-            </div>
-            <button onClick={toggleSidebar} className="text-gray-400 hover:text-gray-600">
-               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-          </div>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">{profile.fitnessGoal}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/8">{profile.dietaryPreference}</span>
+              </div>
 
-          {/* BMI Linear Bar Card */}
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mt-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-6 text-center">BMI Score</h3>
-            
-            {/* External Labels Row */}
-            <div className="flex text-[9px] font-bold text-gray-400 mb-1.5 px-0.5 uppercase tracking-wide">
-               <div style={{ width: '14%' }} className="text-center">Under</div>
-               <div style={{ width: '26%' }} className="text-center">Healthy</div>
-               <div style={{ width: '20%' }} className="text-center">Over</div>
-               <div style={{ width: '40%' }} className="text-center">Obese</div>
-            </div>
-
-            {/* The Bar Container */}
-            <div className="relative h-3 w-full rounded-full flex overflow-visible">
-               {/* Colored Segments (No text inside) */}
-               <div className="h-full bg-red-400/90 rounded-l-full" style={{ width: '14%' }} />
-               <div className="h-full bg-emerald-400/90" style={{ width: '26%' }} />
-               <div className="h-full bg-amber-400/90" style={{ width: '20%' }} />
-               <div className="h-full bg-red-400/90 rounded-r-full" style={{ width: '40%' }} />
-
-               {/* The Indicator (Needle) */}
-               <div 
-                 className="absolute top-0 bottom-0 transition-all duration-1000 ease-in-out z-20"
-                 style={{ left: `${getBmiPosition(metrics.bmi)}%` }}
-               >
-                  {/* Vertical Guide Line */}
-                  <div className="absolute -top-1 h-5 w-0.5 bg-gray-800/20 -translate-x-1/2"></div>
-                  {/* Circle Cap */}
-                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-gray-800 rounded-full shadow-md z-30" />
-               </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: 'Height',   value: `${profile.height}`, unit: 'cm' },
+                  { label: 'Weight',   value: `${profile.weight}`, unit: 'kg' },
+                  { label: 'Activity', value: profile.activityLevel.split(' ')[0], unit: '' },
+                ].map(({ label, value, unit }) => (
+                  <div key={label} className="bg-white/[0.03] rounded-lg px-1.5 py-1.5 text-center">
+                    <p className="text-[8px] text-white/25 uppercase tracking-wider mb-0.5">{label}</p>
+                    <p className="text-[11px] font-mono font-semibold text-white/60 leading-tight">
+                      {value}<span className="text-[8px] text-white/30">{unit ? ` ${unit}` : ''}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Value Display */}
-            <div className="text-center mt-5">
-              <span className={`text-3xl font-bold block
-                 ${metrics.bmiCategory === 'Normal' ? 'text-emerald-500' : 
-                   metrics.bmiCategory === 'Overweight' ? 'text-amber-500' : 'text-red-500'}`
-              }>
-                {metrics.bmi}
-              </span>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-widest">
-                {metrics.bmiCategory}
-              </span>
-            </div>
-          </div>
+            {/* ── Scrollable metrics ──────────────────────────────────────── */}
+            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
 
-          {/* Age & Comparison */}
-          <AgeCard metrics={metrics} profile={profile} />
+              {/* BMI Gauge */}
+              <div>
+                <SectionLabel label="BMI Index" />
+                <BMIGauge bmi={metrics.bmi} category={metrics.bmiCategory} />
+              </div>
 
-          {/* Body Composition Matrix */}
-          <div className="grid grid-cols-2 gap-3">
-             <MetricCard label="Body Fat" value={`${metrics.bodyFatPercentage}%`} sub="Estimated" />
-             <MetricCard 
-                label="Visceral Fat" 
-                value={metrics.visceralFat.toString()} 
-                sub={metrics.visceralFat < 10 ? '(Low Risk)' : metrics.visceralFat < 15 ? '(Moderate)' : '(High Risk)'} 
-                alertLevel={metrics.visceralFat >= 10}
-             />
-             <MetricCard label="BMR" value={metrics.bmr.toString()} sub="Kcal/day" />
-             
-             {/* Weight Range Slider */}
-             <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col justify-center">
-                <p className="text-[10px] text-gray-400 font-medium uppercase mb-3">Weight Range</p>
-                {/* Calculate relative positions */}
-                {(() => {
-                   const minIdeal = parseFloat(metrics.idealWeightRange.split('-')[0]);
-                   const maxIdeal = parseFloat(metrics.idealWeightRange.split('-')[1]);
-                   const displayMin = Math.floor(minIdeal - 10);
-                   const displayMax = Math.ceil(maxIdeal + 10);
-                   
-                   // Ensure 0-100 clamping
-                   const currentPos = Math.min(Math.max((profile.weight - displayMin) / (displayMax - displayMin) * 100, 0), 100);
-                   const idealStartPos = ((minIdeal - displayMin) / (displayMax - displayMin)) * 100;
-                   const idealWidth = ((maxIdeal - minIdeal) / (displayMax - displayMin)) * 100;
+              {/* BMR + Body Fat tiles */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <StatTile label="BMR"       value={`${metrics.bmr}`}              unit="kcal" icon={<Flame   size={12} />} color="text-amber-400" />
+                <StatTile label="Body Fat"  value={`${metrics.bodyFatPercentage}`} unit="%"    icon={<Dumbbell size={12} />} color="text-blue-400"  />
+              </div>
 
-                   return (
-                     <div className="relative pt-1 pb-4">
-                        {/* Track */}
-                        <div className="relative h-1.5 bg-gray-100 rounded-full w-full">
-                           {/* Green Zone (Ideal) */}
-                           <div 
-                              className="absolute h-full bg-emerald-300/50 rounded-full" 
-                              style={{ left: `${idealStartPos}%`, width: `${idealWidth}%` }}
-                           /> 
-                           {/* Current Weight Dot */}
-                           <div 
-                              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-gray-800 border-2 border-white rounded-full shadow-md z-10 transition-all duration-1000"
-                              style={{ left: `${currentPos}%` }} 
-                           />
+              {/* Daily Macro Targets */}
+              <div>
+                <div className="flex items-baseline justify-between mb-3.5">
+                  <SectionLabel label="Daily Targets" />
+                  <span className="font-mono font-bold text-white/65 text-[13px]">
+                    {macros.targetCals}<span className="text-[10px] font-normal text-white/30 ml-1">kcal</span>
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {macroRows.map(({ label, g, color, calPct }) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-[10px] mb-1.5">
+                        <span className="text-white/40">{label}</span>
+                        <span className="font-mono text-white/50">{g}g</span>
+                      </div>
+                      <div className="h-[3px] rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${Math.min(calPct, 100)}%`, background: color + 'B0' }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-white/20 mt-2.5">
+                  TDEE {macros.tdee} kcal · protein {macros.ppkg}g/kg
+                </p>
+              </div>
+
+              {/* Today's Log */}
+              {todayAnalyses.length > 0 && (
+                <div>
+                  <SectionLabel label="Today's Log" />
+                  <div className="space-y-2 mt-3">
+                    {todayAnalyses.map((a) => (
+                      <div key={a.id} className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ChevronRight size={10} className="text-emerald-500/50 shrink-0" />
+                          <span className="text-white/40 truncate">{a.label}</span>
                         </div>
+                        <span className="font-mono font-semibold text-emerald-400/75 ml-2 shrink-0">
+                          {a.macros.calories} kcal
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                        {/* Labels Container */}
-                        <div className="relative w-full h-4 mt-2 text-[9px] text-gray-400 font-medium">
-                           {/* Min Label */}
-                           <span className="absolute left-0">{displayMin}kg</span>
-                           
-                           {/* Max Label */}
-                           <span className="absolute right-0">{displayMax}kg</span>
+              {/* Recommendations */}
+              <div className="pb-2">
+                <SectionLabel label="Recommendations" />
+                <ul className="space-y-2.5 mt-3">
+                  {[
+                    `Target ${macros.targetCals} kcal/day`,
+                    `Protein ${macros.proteinG}g (${macros.ppkg}g/kg body weight)`,
+                    `Carbs ${macros.carbG}g · Fat ${macros.fatG}g`,
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[11px] text-white/40 leading-relaxed">
+                      <span className="mt-[5px] w-1 h-1 rounded-full bg-emerald-500/50 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                           {/* Current Label (Floating) */}
-                           <div 
-                              className="absolute top-0 -translate-x-1/2 text-gray-900 font-extrabold text-xs transition-all duration-1000"
-                              style={{ left: `${currentPos}%` }}
-                           >
-                             {profile.weight}
-                           </div>
-                        </div>
-                     </div>
-                   );
-                })()}
-             </div>
-          </div>
-
-          {/* Water Tracker */}
-          <div className={`bg-blue-50 rounded-2xl p-4 border border-blue-100 transition-all duration-500 ${waterCount === 8 ? 'shadow-lg shadow-blue-200 ring-1 ring-blue-300' : ''}`}>
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-bold text-blue-900">Water Intake</h3>
-              <span className="text-xs font-semibold text-blue-600">{waterCount} / 8 glasses</span>
             </div>
-            <div className="flex gap-1 mb-3">
-              {[...Array(8)].map((_, i) => (
-                 <div key={i} className={`h-8 flex-1 rounded-md transition-all duration-300 ${i < waterCount ? 'bg-blue-500' : 'bg-blue-200/50'} ${waterCount === 8 ? 'animate-pulse' : ''}`} />
-              ))}
-            </div>
-            <div className="flex gap-2">
-               <button onClick={() => setWaterCount(Math.max(0, waterCount - 1))} className="flex-1 py-1.5 bg-white text-blue-600 border border-blue-200 rounded-lg text-sm font-bold hover:bg-blue-50">-</button>
-               <button onClick={() => setWaterCount(Math.min(8, waterCount + 1))} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700">+</button>
-            </div>
-          </div>
 
-          {/* AI Action Items */}
-          <div className="border-t border-gray-100 pt-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">AI Recommendations</h3>
-            <ul className="space-y-2">
-              {metrics.actionItems.map((item, idx) => (
-                <li key={idx} className="flex gap-2 items-start text-sm text-gray-600">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-        </div>
-      </aside>
+            {/* ── Wellness Score (pinned bottom) ──────────────────────────── */}
+            <div className="shrink-0 px-5 py-3.5 border-t border-white/6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Activity size={11} className="text-white/30" />
+                  <span className="text-[9px] text-white/30 uppercase tracking-widest font-semibold">Wellness Score</span>
+                </div>
+                <span className="text-xs font-bold font-mono" style={{ color: wellnessColor }}>{wellnessScore}/100</span>
+              </div>
+              <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${wellnessScore}%` }}
+                  transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+                  style={{ background: `linear-gradient(to right, ${wellnessColor}70, ${wellnessColor})` }}
+                />
+              </div>
+              <p className="text-[8.5px] text-white/15 mt-1.5 text-center">BMI · body fat · activity level</p>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </>
   );
 };
 
-const MetricCard: React.FC<{ label: string; value: string; sub: string; smallValue?: boolean; alertLevel?: boolean }> = ({ label, value, sub, smallValue, alertLevel }) => (
-  <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-    <p className="text-[10px] text-gray-400 font-medium uppercase">{label}</p>
-    <p className={`font-bold ${alertLevel ? 'text-orange-500' : 'text-gray-800'} ${smallValue ? 'text-sm mt-1' : 'text-xl'}`}>{value}</p>
-    <p className="text-[10px] text-gray-400">{sub}</p>
-  </div>
+// ── Sub-components ──────────────────────────────────────────────────────────────
+const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
+  <span className="text-[9px] font-semibold text-white/25 uppercase tracking-[0.15em] block">{label}</span>
 );
 
-const AgeCard: React.FC<{ metrics: HealthMetrics; profile: UserProfile }> = ({ metrics, profile }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const diff = metrics.metabolicAge - profile.age;
-
-  return (
-    <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between relative">
-       <div>
-          <p className="text-xs text-emerald-800 font-semibold uppercase tracking-wider">Metabolic Age</p>
-          <div className="flex items-baseline gap-1">
-             <p className="text-2xl font-bold text-emerald-900">{metrics.metabolicAge}</p>
-             <span className="text-sm text-emerald-700">yrs</span>
-          </div>
-       </div>
-       <div className="text-right">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] text-emerald-600/80 font-medium uppercase">Actual Age</span>
-            <span className="text-xl font-bold text-gray-700">{profile.age}</span>
-          </div>
-          <button 
-             onClick={() => setShowTooltip(!showTooltip)}
-             className={`text-[10px] font-bold block mt-1 hover:underline cursor-pointer transition-colors ${diff < 0 ? 'text-emerald-600' : 'text-orange-500'}`}
-          >
-            {diff <= 0 ? '↓ Trending Younger' : '↑ Older than actual'}
-          </button>
-       </div>
-
-       {/* Tooltip */}
-       {showTooltip && (
-          <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-white border border-emerald-100 shadow-xl rounded-xl z-50 text-xs text-gray-600 animate-in fade-in zoom-in-95 duration-200">
-             <p className="font-bold text-gray-800 mb-1">About Metabolic Age</p>
-             <p>Your BMR suggests your body is functioning like that of a {metrics.metabolicAge}-year-old. {diff < 0 ? "Great job!" : "We can improve this."}</p>
-             <div className="absolute top-0 right-4 w-2 h-2 bg-white border-l border-t border-emerald-100 -translate-y-1/2 rotate-45"></div>
-          </div>
-       )}
+const StatTile: React.FC<{
+  label: string; value: string; unit: string;
+  icon: React.ReactNode; color: string;
+}> = ({ label, value, unit, icon, color }) => (
+  <div className={cn('bg-white/[0.03] rounded-xl p-3 border border-white/[0.05]')}>
+    <div className={cn('flex items-center gap-1 mb-1.5', color)}>
+      {icon}
+      <span className="text-[9px] uppercase tracking-wider font-semibold opacity-60">{label}</span>
     </div>
-  );
-};
+    <div className="flex items-baseline gap-1">
+      <span className="font-mono font-bold text-[#F0FDF4] text-lg leading-none">{value}</span>
+      {unit && <span className="text-[10px] text-white/25">{unit}</span>}
+    </div>
+  </div>
+);
 
 export default HealthSidebar;
