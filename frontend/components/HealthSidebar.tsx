@@ -7,16 +7,15 @@ import { cn } from '../lib/utils';
 
 // ── BMI Linear Bar Gauge ────────────────────────────────────────────────────────
 const BMIGauge: React.FC<{ bmi: number; category: string }> = ({ bmi, category }) => {
-  // Zone definitions: [bmiStart, bmiEnd] → bar [barStart%, barEnd%]
   const zones = [
-    { label: 'UNDER',  bmiMin: 15,   bmiMax: 18.5, barMin: 0,  barMax: 15,  color: '#6366F1', bg: 'bg-[#6366F1]' },
-    { label: 'NORMAL', bmiMin: 18.5, bmiMax: 25,   barMin: 15, barMax: 45,  color: '#22C55E', bg: 'bg-[#22C55E]' },
-    { label: 'OVER',   bmiMin: 25,   bmiMax: 30,   barMin: 45, barMax: 70,  color: '#F59E0B', bg: 'bg-[#F59E0B]' },
-    { label: 'OBESE',  bmiMin: 30,   bmiMax: 40,   barMin: 70, barMax: 100, color: '#EF4444', bg: 'bg-[#EF4444]' },
+    { label: 'UNDER',  bmiMin: 15,   bmiMax: 18.5, barMin: 0,  barMax: 15,  color: '#6366F1' },
+    { label: 'NORMAL', bmiMin: 18.5, bmiMax: 25,   barMin: 15, barMax: 45,  color: '#22C55E' },
+    { label: 'OVER',   bmiMin: 25,   bmiMax: 30,   barMin: 45, barMax: 70,  color: '#F59E0B' },
+    { label: 'OBESE',  bmiMin: 30,   bmiMax: 40,   barMin: 70, barMax: 100, color: '#EF4444' },
   ];
 
   const catColor =
-    category === 'Normal'      ? '#22C55E'
+    category === 'Normal'       ? '#22C55E'
     : category === 'Overweight' ? '#F59E0B'
     : category === 'Underweight'? '#6366F1'
     : '#EF4444';
@@ -24,68 +23,81 @@ const BMIGauge: React.FC<{ bmi: number; category: string }> = ({ bmi, category }
   // Zone-aware needle position: interpolate within the active zone's bar range
   const clampedBmi = Math.min(Math.max(bmi, 15), 40);
   const activeZone = zones.find((z) => clampedBmi >= z.bmiMin && clampedBmi <= z.bmiMax) ?? zones[zones.length - 1];
-  const needlePct = activeZone.barMin + ((clampedBmi - activeZone.bmiMin) / (activeZone.bmiMax - activeZone.bmiMin)) * (activeZone.barMax - activeZone.barMin);
+  const needlePct = activeZone.barMin +
+    ((clampedBmi - activeZone.bmiMin) / (activeZone.bmiMax - activeZone.bmiMin)) *
+    (activeZone.barMax - activeZone.barMin);
 
   return (
-    <div className="mt-3">
-      {/* BMI number + category */}
-      <div className="text-center mb-4">
-        <span className="font-mono font-bold text-4xl leading-none" style={{ color: catColor }}>
-          {bmi}
-        </span>
-        <p className="text-[10px] font-semibold tracking-[0.18em] mt-1" style={{ color: catColor + 'BB' }}>
-          {category.toUpperCase()}
-        </p>
+    <div className="w-full py-1 select-none">
+      {/* BMI value + category — pinned to same x as needle */}
+      <div className="relative h-[72px] mb-3">
+        <div
+          className="absolute flex flex-col items-center"
+          style={{ left: `${needlePct}%`, transform: 'translateX(-50%)', top: 0 }}
+        >
+          <span
+            className="text-[46px] font-bold font-mono leading-none"
+            style={{ color: catColor, textShadow: `0 0 28px ${catColor}55` }}
+          >
+            {bmi}
+          </span>
+          <span
+            className="text-[9px] font-bold tracking-[0.25em] mt-1"
+            style={{ color: catColor }}
+          >
+            {category.toUpperCase()}
+          </span>
+        </div>
       </div>
 
-      {/* Bar + needle wrapper */}
+      {/* Gauge bar + glowing vertical needle */}
       <div className="relative">
-        {/* Needle */}
+        {/* Needle — spans above and below bar */}
         <div
-          className="absolute -top-2 z-10 flex flex-col items-center"
-          style={{ left: `${needlePct}%`, transform: 'translateX(-50%)' }}
-        >
-          {/* Needle triangle pointing down */}
-          <div className="w-0 h-0" style={{
-            borderLeft: '4px solid transparent',
-            borderRight: '4px solid transparent',
-            borderTop: `6px solid ${catColor}`,
-            filter: `drop-shadow(0 0 4px ${catColor})`,
-          }} />
-        </div>
+          className="absolute z-10 rounded-full pointer-events-none"
+          style={{
+            left: `${needlePct}%`,
+            transform: 'translateX(-50%)',
+            top: '-5px',
+            width: '2.5px',
+            height: 'calc(100% + 10px)',
+            background: '#ffffff',
+            boxShadow: `0 0 8px 3px ${catColor}80, 0 0 3px 1px #ffffffa0`,
+          }}
+        />
 
         {/* Coloured segments */}
-        <div className="flex h-3 rounded-full overflow-hidden gap-[2px]">
-          {zones.map((z, i) => (
+        <div className="flex h-[10px] gap-[2px]">
+          {zones.map(({ label, color, barMin, barMax }, i) => (
             <div
-              key={z.label}
-              className={z.bg}
+              key={label}
               style={{
-                width: `${z.barMax - z.barMin}%`,
-                opacity: z.color === activeZone.color ? 1 : 0.28,
+                width: `${barMax - barMin}%`,
+                backgroundColor: color,
+                opacity: color === activeZone.color ? 0.85 : 0.28,
                 borderRadius:
-                  i === 0 ? '9999px 0 0 9999px'
-                  : i === zones.length - 1 ? '0 9999px 9999px 0'
+                  i === 0 ? '5px 0 0 5px'
+                  : i === zones.length - 1 ? '0 5px 5px 0'
                   : '0',
-                boxShadow: z.color === activeZone.color ? `0 0 8px ${z.color}80` : 'none',
+                boxShadow: color === activeZone.color ? `0 0 6px ${color}70` : 'none',
               }}
             />
           ))}
         </div>
 
-        {/* Zone labels below bar */}
-        <div className="flex mt-1.5">
-          {zones.map((z) => (
+        {/* Zone labels */}
+        <div className="flex mt-2">
+          {zones.map(({ label, color, barMin, barMax }) => (
             <div
-              key={z.label}
-              className="text-center"
-              style={{ width: `${z.barMax - z.barMin}%` }}
+              key={label}
+              className="flex justify-center"
+              style={{ width: `${barMax - barMin}%` }}
             >
               <span
-                className="text-[8px] font-semibold tracking-wider"
-                style={{ color: z.color === activeZone.color ? z.color + 'CC' : '#ffffff25' }}
+                className="text-[7.5px] font-semibold tracking-[0.12em] uppercase"
+                style={{ color: color === activeZone.color ? color + 'BB' : '#ffffff25' }}
               >
-                {z.label}
+                {label}
               </span>
             </div>
           ))}
