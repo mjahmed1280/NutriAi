@@ -1,4 +1,3 @@
-import React from 'react';
 import Navbar from './LandingPage/Navbar';
 import Hero from './LandingPage/Hero';
 import StatsBar from './LandingPage/StatsBar';

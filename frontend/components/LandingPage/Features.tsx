@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { Camera, Target, BarChart2, Dna, Apple, Zap } from 'lucide-react';
+import { Camera, Target, BarChart2, Apple, Zap } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 const MACRO_DATA = [

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Leaf, TrendingDown, Zap } from 'lucide-react';
+import { Leaf } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 const TYPEWRITER_STRINGS = [
