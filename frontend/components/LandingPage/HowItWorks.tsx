@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { UserCheck, MessageSquare, Sparkles } from 'lucide-react';

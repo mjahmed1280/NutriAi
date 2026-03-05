@@ -24,7 +24,7 @@ interface AppStore {
 
 export const useAppStore = create<AppStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       appState: 'landing',
       profile: null,
       messages: [],
