@@ -150,8 +150,8 @@ export default function Hero() {
           {/* Eyebrow badge */}
           <motion.div variants={item} className="inline-flex items-center gap-2 mb-6">
             <span className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-semibold tracking-wide">
-              <img src="/gemini-star.png" alt="Gemini" className="h-4 w-auto rounded" />
-              POWERED BY GOOGLE GEMINI 2.5
+              {/* <img src="/gemini-star.png" alt="Gemini" className="h-4 w-auto rounded" /> */}
+              POWERED BY GOOGLE GEMINI 3
             </span>
           </motion.div>
 
